@@ -1,4 +1,6 @@
+import hashlib
 from io import BytesIO
+import os
 import PIL
 from PIL import Image
 import random
@@ -7,28 +9,43 @@ import string
 import threading
 import time
 
+doesnotexisthash = "8b61c3a7e12f9c5f6c623981131d568b"
+
+def isexist(img):
+    img_hash = None
+    with open(img, 'rb') as f:
+        img_hash = hashlib.md5(f.read()).hexdigest()
+    os.remove(img)
+    print(f'{img} removed')
+    return img_hash != doesnotexisthash
+
 def scrape_pics(count_per_thread):
     i = 0
-    while i <= count_per_thread:
+    while i < count_per_thread:
+        length = random.choice((5, 7))
+        ext = random.choice(('.png', '.jpg'))
         url = 'http://i.imgur.com/'
-        length = random.choice((5, 6))
+        
         if length == 5:
             url += ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(5))
-        else:
-            url += ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(3))
-            url += ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(3))
-
-        url += '.jpg'
-
+            url += ext
+        elif length == 7:
+            url += ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(7))
+            url += ext
+        
         filename = url.split('/')[-1]
         try:
-            Image.open(BytesIO(requests.get(url).content)).save(f"./.cache/{filename}")
-            print(url)
-            i += 1
+            img = Image.open(BytesIO(requests.get(url).content))
+            img.save(f'./.cache/.tmp_{filename}')
+            print(f'Saved tmp_{filename}')
+            if isexist(f'./.cache/.tmp_{filename}'):
+                img.save(f"./.cache/{filename}")
+                print(f"{url} => {filename}")
+                i += 1
+            else:
+                os.remove(f'./.cache/.tmp_{filename}')
         except (PIL.UnidentifiedImageError, OSError):
             pass
-
-
 
 start = time.time()
 count = int(input('Count of images: '))
@@ -36,6 +53,7 @@ count = int(input('Count of images: '))
 thread_amount = count // 2 if count % 2 == 0 else (count // 2) + 1
 threads = []
 count_per_thread = count // thread_amount
+
 for i in range(0, thread_amount):
     thread = threading.Thread(target=scrape_pics, args=(count_per_thread,))
     threads.append(thread)
